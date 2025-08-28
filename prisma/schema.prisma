@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String          @id @default(cuid())
+  name          String?
+  username      String?         @unique
+  email         String?         @unique
+  emailVerified DateTime?
+  image         String?
+  premium       Boolean         @default(false)
+  accounts      Account[]
+  sessions      Session[]
+  following     Follow[] @relation("following")
+  followed      Follow[] @relation("followed")
+  Post          Post[]
+  likes         Like[]
+  resplies      Reply[]
+  notifications Notification[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+    // For WebAuthn support
+  Authenticator Authenticator[]
+}
+ 
+model Account {
+  id                       String  @id @default(cuid())
+  userId                   String  @unique
+  type                     String
+  provider                 String
+  providerAccountId        String
+  refresh_token            String? // @db.Text  // For ease of changing into mySQL if needed
+  access_token             String? // @db.Text  // For ease of changing into mySQL if needed
+  expires_at               Int?
+  token_type               String?
+  scope                    String?
+  id_token                 String? // @db.Text  // For ease of changing into mySQL if needed
+  session_state            String?
+  refresh_token_expires_in Int?
+  user                     User?   @relation(fields: [userId], references: [id])
+ 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+ 
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+ 
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id])
+ 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+ 
+  @@index([userId])
+}
+ 
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+ 
+  @@unique([identifier, token])
+}
+
+model Follow {
+  id            String          @id @default(cuid())
+  following     User            @relation("following", references: [id], fields: [followingId], onDelete: Cascade)
+  followingId   String
+  followed      User            @relation("followed", references: [id], fields: [followedId], onDelete: Cascade)
+  followedId    String
+}
+
+model Post {
+id              String          @id @default(cuid())
+user            User            @relation(references: [id], fields: [userId])
+userId          String
+content         String
+created_at      DateTime        @default(now())
+collapsed       Boolean         @default(false)
+likes           Like[]
+replies         Reply[]
+}
+
+model Like {
+id              String @id @default(cuid())
+post            Post @relation(references: [id], fields: [postId], onDelete: Cascade)
+postId          String
+user            User @relation(references: [id], fields: [userId])
+userId          String
+}
+
+model Reply {
+id              String @id @default(cuid())
+post            Post @relation(references: [id], fields: [postId], onDelete: Cascade)
+postId          String
+user            User @relation(references: [id], fields: [userId])
+userId          String
+content         String
+created_at      DateTime @default(now())
+}
+
+model Notification {
+id              String @id @default(cuid())
+user            User @relation(references: [id], fields: [userId], onDelete: Cascade)
+userId          String
+content         String
+read            Boolean @default(false)
+create_at       DateTime @default(now())
+}
+ 
+// Optional for WebAuthn support
+model Authenticator {
+  credentialID         String  @unique
+  userId               String
+  providerAccountId    String
+  credentialPublicKey  String
+  counter              Int
+  credentialDeviceType String
+  credentialBackedUp   Boolean
+  transports           String?
+ 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ 
+  @@id([userId, credentialID])
+}
